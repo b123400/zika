@@ -127,6 +127,42 @@ impl MqttBroker {
             if let (Some(u), Some(p)) = (&opts.username, &opts.password) {
                 options.set_credentials(u, p);
             };
+
+            use std::fs::File;
+            use std::io::Read;
+            use std::io::BufReader;
+
+            let mut cert_file = File::open("/Users/b123400/github/zika/cert.pem").unwrap();
+            let mut key = File::open("/Users/b123400/github/zika/key.pem").unwrap();
+            // let mut cert_buffer = Vec::new();
+            // let mut key_buffer = Vec::new();
+
+            let mut cert_buf_read = BufReader::new(cert_file);
+
+            let mut root_cert_store = rustls::RootCertStore::empty();
+            let certs = rustls_pemfile::certs(&mut cert_buf_read);
+            for cert in certs.into_iter() {
+                root_cert_store.add(&rustls::Certificate(cert.unwrap().to_vec())).unwrap();
+            }
+
+            let tls_config = rustls::ClientConfig::builder()
+                .with_safe_defaults()
+                .with_root_certificates(root_cert_store)
+                .with_no_client_auth();
+
+            // read the whole file
+            // cert.read_to_end(&mut cert_buffer).unwrap();
+            // key.read_to_end(&mut key_buffer).unwrap();
+
+            // let tls_config = rumqttc::TlsConfiguration::SimpleNative {
+            //     ca: cert_buffer,
+            //     der: key_buffer,
+            //     password: "".to_string(),
+            // };
+            let transport = rumqttc::Transport::tls_with_config(
+                rumqttc::TlsConfiguration::Rustls(std::sync::Arc::new(tls_config))
+            );
+            options.set_transport(transport);
         };
         return options;
     }
